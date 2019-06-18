@@ -100,6 +100,8 @@ private:
   double steer_lim_deg_;            //!< @brief steering command limit [rad]
   double wheelbase_;                //!< @brief vehicle wheelbase length [m] to convert steering angle to angular velocity
   double steering_gear_ratio_;      //!< @brief steering gear ratio to convert steering to steering_wheel
+  double fric_comp_p_gain_;
+  double fric_comp_max_deg_;
 
   /* parameters for path smoothing */
   bool enable_path_smoothing_;     //< @brief flag for path smoothing

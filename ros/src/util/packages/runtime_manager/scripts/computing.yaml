@@ -1886,6 +1886,24 @@ params :
       cmd_param :
         dash        : ''
         delim       : ':='
+    - name  : fric_comp_p_gain_
+      desc  : fric_comp_p_gain_
+      label : fric_comp_p_gain [-]
+      min   : 0.0
+      max   : 10.0
+      v     : 2.0
+      cmd_param :
+        dash        : ''
+        delim       : ':='
+    - name  : fric_comp_max_deg_
+      desc  : fric_comp_max_deg_
+      label : fric_comp_max [deg]
+      min   : 0.0
+      max   : 20.0
+      v     : 10.0
+      cmd_param :
+        dash        : ''
+        delim       : ':='
   - name  : astar_avoid_param
     vars  :
     - name  : enable_avoidance

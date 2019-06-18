@@ -51,6 +51,10 @@ MPCFollower::MPCFollower()
   pnh_.param("steering_gear_ratio", steering_gear_ratio_, double(19.0));
   pnh_.param("vehicle_model_wheelbase", wheelbase_, double(2.9));
 
+  /* friction compensation */
+  pnh_.param("fric_comp_p_gain", fric_comp_p_gain_, double(2.0));
+  pnh_.param("fric_comp_max_deg", fric_comp_max_deg_, double(15.0));
+
   /* vehicle model setup */
   pnh_.param("vehicle_model_type", vehicle_model_type_, std::string("kinematics"));
   if (vehicle_model_type_ == "kinematics")
@@ -448,8 +452,11 @@ bool MPCFollower::calculateMPC(double &vel_cmd, double &acc_cmd, double &steer_c
   /* filtering */
   const double u_filtered = lpf_steering_cmd_.filter(u_sat);
 
+  /* steering friction compensator */
+  const double u_friccomp = std::max(std::min(fric_comp_p_gain_ * (u_filtered - steer), fric_comp_max_deg_), -fric_comp_max_deg_);
+
   /* set steering command */
-  steer_cmd = u_filtered;
+  steer_cmd = u_filtered + u_friccomp;
   steer_vel_cmd = (Uex(1) - Uex(0)) / DT;
 
   /* Velocity control: for simplicity, now we calculate steer and speed separately */
@@ -484,6 +491,10 @@ bool MPCFollower::calculateMPC(double &vel_cmd, double &acc_cmd, double &steer_c
   /* publish debug values */
   if (publish_debug_values_)
   {
+    std_msgs::Float64MultiArray dabug_values_msg;
+    dabug_values_msg.data.push_back(u_friccomp);
+    pub_debug_values_.publish(dabug_values_msg);
+
     std_msgs::Float32 steer_cmd_msg; // final steering command (MPC + LPF)
     steer_cmd_msg.data = steer_cmd;
     pub_debug_steer_cmd_.publish(steer_cmd_msg);
