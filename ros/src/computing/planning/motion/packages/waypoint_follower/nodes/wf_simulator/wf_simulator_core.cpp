@@ -109,6 +109,30 @@ WFSimulator::WFSimulator() : nh_(""), pnh_("~"), is_initialized_(false), is_prev
         ROS_ERROR("Invalid vehicle_model_type. Initialization failed.");
     }
 
+    /* set normal distribution noises */
+    int random_seed;
+    pnh_.param("random_seed", random_seed, -1);
+    if (random_seed >= 0)
+    {
+        rand_engine_ptr_ = std::make_shared<std::mt19937>(random_seed);
+    }
+    else
+    {
+        std::random_device seed;
+        rand_engine_ptr_ = std::make_shared<std::mt19937>(seed());
+    }
+    double pos_noise_stddev, vel_noise_stddev, rpy_noise_stddev, angvel_noise_stddev, steer_noise_stddev;
+    pnh_.param("pos_noise_stddev", pos_noise_stddev, 1e-2);
+    pnh_.param("vel_noise_stddev", vel_noise_stddev, 1e-2);
+    pnh_.param("rpy_noise_stddev", rpy_noise_stddev, 1e-3);
+    pnh_.param("angvel_noise_stddev", angvel_noise_stddev, 1e-3);
+    pnh_.param("steer_noise_stddev", steer_noise_stddev, 1e-4);
+    pos_norm_dist_ptr_ = std::make_shared<std::normal_distribution<>>(0.0, pos_noise_stddev);
+    vel_norm_dist_ptr_ = std::make_shared<std::normal_distribution<>>(0.0, vel_noise_stddev);
+    rpy_norm_dist_ptr_ = std::make_shared<std::normal_distribution<>>(0.0, rpy_noise_stddev);
+    angvel_norm_dist_ptr_ = std::make_shared<std::normal_distribution<>>(0.0, angvel_noise_stddev);
+    steer_norm_dist_ptr_ = std::make_shared<std::normal_distribution<>>(0.0, steer_noise_stddev);
+
     /* set initialize source */
     std::string initialize_source;
     pnh_.param("initialize_source", initialize_source, std::string("Origin"));
@@ -187,18 +211,19 @@ void WFSimulator::timerCallbackSimulation(const ros::TimerEvent &e)
     vehicle_model_ptr_->updateRungeKutta(dt);
 
     /* save current vehicle pose & twist */
-    current_pose_.position.x = vehicle_model_ptr_->getX();
-    current_pose_.position.y = vehicle_model_ptr_->getY();
+    current_pose_.position.x = vehicle_model_ptr_->getX() + (*pos_norm_dist_ptr_)(*rand_engine_ptr_);
+    current_pose_.position.y = vehicle_model_ptr_->getY() + (*pos_norm_dist_ptr_)(*rand_engine_ptr_);
     current_pose_.orientation = getQuaternionFromYaw(vehicle_model_ptr_->getYaw());
-    current_pose_.position.z = 0.0;
+
+    current_pose_.position.z = (*pos_norm_dist_ptr_)(*rand_engine_ptr_);
     if (current_waypoints_ptr_ && current_closest_waypoint_ptr_)
     {
         const int idx = current_closest_waypoint_ptr_->data;
         if (-1 < idx && idx < (int)current_waypoints_ptr_->waypoints.size())
             current_pose_.position.z = current_waypoints_ptr_->waypoints.at(idx).pose.pose.position.z;
     }
-    current_twist_.linear.x = vehicle_model_ptr_->getVx();
-    current_twist_.angular.z = vehicle_model_ptr_->getWz();
+    current_twist_.linear.x = vehicle_model_ptr_->getVx() + (*vel_norm_dist_ptr_)(*rand_engine_ptr_);
+    current_twist_.angular.z = vehicle_model_ptr_->getWz() + (*angvel_norm_dist_ptr_)(*rand_engine_ptr_);
 
     /* publish pose & twist */
     publishPoseTwist(current_pose_, current_twist_);
@@ -208,7 +233,7 @@ void WFSimulator::timerCallbackSimulation(const ros::TimerEvent &e)
     vs.header.stamp = ros::Time::now();
     vs.header.frame_id = "base_link";
     vs.speed = current_twist_.linear.x;
-    vs.angle = vehicle_model_ptr_->getSteer();
+    vs.angle = vehicle_model_ptr_->getSteer() + (*steer_norm_dist_ptr_)(*rand_engine_ptr_);
     pub_vehicle_status_.publish(vs);
 }
 
@@ -363,7 +388,9 @@ void WFSimulator::publishTF(const geometry_msgs::Pose &pose, const geometry_msgs
 geometry_msgs::Quaternion WFSimulator::getQuaternionFromYaw(const double &_yaw)
 {
     tf2::Quaternion q;
-    q.setRPY(0, 0, _yaw);
+    q.setRPY((*rpy_norm_dist_ptr_)(*rand_engine_ptr_),
+             (*rpy_norm_dist_ptr_)(*rand_engine_ptr_),
+             _yaw + (*rpy_norm_dist_ptr_)(*rand_engine_ptr_));
 
     return tf2::toMsg(q);
 }

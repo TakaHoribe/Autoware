@@ -28,6 +28,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/LU>
+#include <random>
 
 #include "autoware_msgs/VehicleCmd.h"
 #include "autoware_msgs/VehicleStatus.h"
@@ -91,6 +92,12 @@ private:
     } vehicle_model_type_;
 
     std::shared_ptr<WFSimModelInterface> vehicle_model_ptr_;
+    std::shared_ptr<std::mt19937> rand_engine_ptr_;
+    std::shared_ptr<std::normal_distribution<>> pos_norm_dist_ptr_;
+    std::shared_ptr<std::normal_distribution<>> vel_norm_dist_ptr_;
+    std::shared_ptr<std::normal_distribution<>> rpy_norm_dist_ptr_;
+    std::shared_ptr<std::normal_distribution<>> angvel_norm_dist_ptr_;
+    std::shared_ptr<std::normal_distribution<>> steer_norm_dist_ptr_;
 
     void callbackVehicleCmd(const autoware_msgs::VehicleCmdConstPtr &msg);
     void callbackWaypoints(const autoware_msgs::LaneConstPtr &msg);
