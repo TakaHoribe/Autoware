@@ -16,12 +16,21 @@
  */
 
 #include "wf_simulator/wfsim_model_time_delay.hpp"
+#define MIN_TIME_CONSTANT 0.01
 
 WFSimModelTimeDelayTwist::WFSimModelTimeDelayTwist(double vx_lim, double wz_lim, double dt, double vx_delay,
                              double vx_time_constant, double wz_delay, double wz_time_constant)
     : WFSimModelInterface(5 /* dim x */, 2 /* dim u */), vx_lim_(vx_lim), wz_lim_(wz_lim), vx_delay_(vx_delay),
-      vx_time_constant_(vx_time_constant), wz_delay_(wz_delay), wz_time_constant_(wz_time_constant)
+      vx_time_constant_(std::max(vx_time_constant, MIN_TIME_CONSTANT)), wz_delay_(wz_delay), wz_time_constant_(std::max(wz_time_constant, MIN_TIME_CONSTANT))
 {
+    if (vx_time_constant < MIN_TIME_CONSTANT)
+    {
+        ROS_WARN("Settings vx_time_constant is too small, replace it by %f", MIN_TIME_CONSTANT);
+    }
+    if (wz_time_constant < MIN_TIME_CONSTANT)
+    {
+        ROS_WARN("Settings wz_time_constant is too small, replace it by %f", MIN_TIME_CONSTANT);
+    }
     initializeInputQueue(dt);
 };
 
@@ -48,12 +57,12 @@ void WFSimModelTimeDelayTwist::initializeInputQueue(const double &dt)
 
 Eigen::VectorXd WFSimModelTimeDelayTwist::calcModel(const Eigen::VectorXd &state, const Eigen::VectorXd &input)
 {
+    vx_input_queue_.push_back(input_(IDX_U::VX_DES));
     const double delay_input_vx = vx_input_queue_.front();
     vx_input_queue_.pop_front();
-    vx_input_queue_.push_back(input_(IDX_U::VX_DES));
+    wz_input_queue_.push_back(input_(IDX_U::WZ_DES));
     const double delay_input_wz = wz_input_queue_.front();
     wz_input_queue_.pop_front();
-    wz_input_queue_.push_back(input_(IDX_U::WZ_DES));
 
     const double vx = state(IDX::VX);
     const double wz = state(IDX::WZ);
@@ -75,8 +84,17 @@ Eigen::VectorXd WFSimModelTimeDelayTwist::calcModel(const Eigen::VectorXd &state
 WFSimModelTimeDelaySteer::WFSimModelTimeDelaySteer(double vel_lim, double steer_lim, double wheelbase, double dt, double vel_delay,
                                                    double vel_time_constant, double steer_delay, double steer_time_constant)
     : WFSimModelInterface(5 /* dim x */, 2 /* dim u */), vel_lim_(vel_lim), steer_lim_(steer_lim), wheelbase_(wheelbase), vel_delay_(vel_delay),
-      vel_time_constant_(vel_time_constant), steer_delay_(steer_delay), steer_time_constant_(steer_time_constant)
+      vel_time_constant_(std::max(vel_time_constant, MIN_TIME_CONSTANT)), steer_delay_(steer_delay), steer_time_constant_(std::max(steer_time_constant, MIN_TIME_CONSTANT))
 {
+    if (vel_time_constant < MIN_TIME_CONSTANT)
+    {
+        ROS_WARN("Settings vel_time_constant is too small, replace it by %f", MIN_TIME_CONSTANT);
+    }
+    if (steer_time_constant < MIN_TIME_CONSTANT)
+    {
+        ROS_WARN("Settings steer_time_constant is too small, replace it by %f", MIN_TIME_CONSTANT);
+    }
+
     initializeInputQueue(dt);
 };
 
@@ -103,12 +121,12 @@ void WFSimModelTimeDelaySteer::initializeInputQueue(const double &dt)
 
 Eigen::VectorXd WFSimModelTimeDelaySteer::calcModel(const Eigen::VectorXd &state, const Eigen::VectorXd &input)
 {
+    vel_input_queue_.push_back(input_(IDX_U::VX_DES));
     const double delay_input_vel = vel_input_queue_.front();
     vel_input_queue_.pop_front();
-    vel_input_queue_.push_back(input_(IDX_U::VX_DES));
+    steer_input_queue_.push_back(input_(IDX_U::STEER_DES));
     const double delay_input_steer = steer_input_queue_.front();
     steer_input_queue_.pop_front();
-    steer_input_queue_.push_back(input_(IDX_U::STEER_DES));
 
     const double vel = state(IDX::VX);
     const double yaw = state(IDX::YAW);
