@@ -14,35 +14,112 @@
  * limitations under the License.
  */
 
+/**
+ * @file wfsim_model_interface.hpp
+ * @brief wf_siulator model interface class
+ * @author Takamasa Horibe
+ * @date 2019.09.17
+ */
+
 #pragma once
 #include <ros/ros.h>
 #include <eigen3/Eigen/Core>
 
+/** 
+ * @class wf_simulator vehicle model class
+ * @brief calculate vehicle dynamics
+ */
 class WFSimModelInterface
 {
 protected:
-  const int dim_x_; //!< @brief dimension of state x
-  const int dim_u_; //!< @brief dimension of input u
-  Eigen::VectorXd state_;
-  Eigen::VectorXd input_;
+  const int dim_x_;       //!< @brief dimension of state x
+  const int dim_u_;       //!< @brief dimension of input u
+  Eigen::VectorXd state_; //!< @brief vehicle state vector
+  Eigen::VectorXd input_; //!< @brief vehicle input vector
 
 public:
+  /**
+   * @brief constructor
+   * @param [in] dim_x dimension of state x
+   * @param [in] dim_u dimension of input u
+   */
   WFSimModelInterface(int dim_x, int dim_u);
+
+  /**
+   * @brief destructor
+   */
   ~WFSimModelInterface() = default;
 
+  /**
+   * @brief get state vector of model
+   * @param [out] state state vector
+   */
   void getState(Eigen::VectorXd &state);
+
+  /**
+   * @brief get input vector of model
+   * @param [out] input input vector
+   */
   void getInput(Eigen::VectorXd &input);
+
+  /**
+   * @brief set state vector of model
+   * @param [in] state state vector
+   */
   void setState(const Eigen::VectorXd &state);
+
+  /**
+   * @brief set input vector of model
+   * @param [in] input input vector
+   */
   void setInput(const Eigen::VectorXd &input);
 
+  /**
+   * @brief update vehicle states with Runge-Kutta methods
+   * @param [in] dt delta time [s]
+   */
   void updateRungeKutta(const double &dt);
+
+  /**
+   * @brief update vehicle states with Euler methods
+   * @param [in] dt delta time [s]
+   */
   void updateEuler(const double &dt);
 
+  /**
+   * @brief get vehicle position x
+   */
   virtual double getX() = 0;
+
+  /**
+   * @brief get vehicle position y
+   */
   virtual double getY() = 0;
+
+  /**
+   * @brief get vehicle angle yaw
+   */
   virtual double getYaw() = 0;
+
+  /**
+   * @brief get vehicle velocity vx
+   */
   virtual double getVx() = 0;
+
+  /**
+   * @brief get vehicle angular-velocity wz
+   */
   virtual double getWz() = 0;
+
+  /**
+   * @brief get vehicle steering angle 
+   */
   virtual double getSteer() = 0;
+
+  /**
+   * @brief calculate derivative of states with vehicle model
+   * @param [in] state current model state
+   * @param [in] input input vector to model
+   */
   virtual Eigen::VectorXd calcModel(const Eigen::VectorXd &state, const Eigen::VectorXd &input) = 0;
 };

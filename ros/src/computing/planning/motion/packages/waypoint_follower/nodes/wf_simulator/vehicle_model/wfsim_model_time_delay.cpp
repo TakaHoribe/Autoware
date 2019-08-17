@@ -16,11 +16,10 @@
  */
 
 #include "wf_simulator/wfsim_model_time_delay.hpp"
-#define MIN_TIME_CONSTANT 0.01
 
 WFSimModelTimeDelayTwist::WFSimModelTimeDelayTwist(double vx_lim, double wz_lim, double dt, double vx_delay,
                              double vx_time_constant, double wz_delay, double wz_time_constant)
-    : WFSimModelInterface(5 /* dim x */, 2 /* dim u */), vx_lim_(vx_lim), wz_lim_(wz_lim), vx_delay_(vx_delay),
+    : WFSimModelInterface(5 /* dim x */, 2 /* dim u */), MIN_TIME_CONSTANT(0.03), vx_lim_(vx_lim), wz_lim_(wz_lim), vx_delay_(vx_delay),
       vx_time_constant_(std::max(vx_time_constant, MIN_TIME_CONSTANT)), wz_delay_(wz_delay), wz_time_constant_(std::max(wz_time_constant, MIN_TIME_CONSTANT))
 {
     if (vx_time_constant < MIN_TIME_CONSTANT)
@@ -83,7 +82,7 @@ Eigen::VectorXd WFSimModelTimeDelayTwist::calcModel(const Eigen::VectorXd &state
 
 WFSimModelTimeDelaySteer::WFSimModelTimeDelaySteer(double vel_lim, double steer_lim, double wheelbase, double dt, double vel_delay,
                                                    double vel_time_constant, double steer_delay, double steer_time_constant)
-    : WFSimModelInterface(5 /* dim x */, 2 /* dim u */), vel_lim_(vel_lim), steer_lim_(steer_lim), wheelbase_(wheelbase), vel_delay_(vel_delay),
+    : WFSimModelInterface(5 /* dim x */, 2 /* dim u */), MIN_TIME_CONSTANT(0.03), vel_lim_(vel_lim), steer_lim_(steer_lim), wheelbase_(wheelbase), vel_delay_(vel_delay),
       vel_time_constant_(std::max(vel_time_constant, MIN_TIME_CONSTANT)), steer_delay_(steer_delay), steer_time_constant_(std::max(steer_time_constant, MIN_TIME_CONSTANT))
 {
     if (vel_time_constant < MIN_TIME_CONSTANT)

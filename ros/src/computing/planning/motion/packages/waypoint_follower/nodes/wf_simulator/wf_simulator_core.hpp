@@ -65,7 +65,7 @@ private:
     std::shared_ptr<autoware_msgs::Lane> current_waypoints_ptr_;
     std::shared_ptr<std_msgs::Int32> current_closest_waypoint_ptr_;
     bool is_initialized_;
-    bool is_prev_time_recorded_;
+    bool add_measurement_noise_;
 
     tf::TransformListener tf_listener_;
     tf::TransformBroadcaster tf_broadcaster_;
@@ -73,7 +73,7 @@ private:
     std::string simulation_frame_id_;
     std::string map_frame_id_;
     std::string lidar_frame_id_;
-    ros::Time prev_update_time_;
+    std::shared_ptr<ros::Time> prev_update_time_ptr_;
 
     double loop_rate_;
     double lidar_height_;
@@ -113,5 +113,5 @@ private:
     void setInitialStateWithPoseTransform(const geometry_msgs::PoseWithCovarianceStamped &pose, const geometry_msgs::Twist &twist);
     void publishPoseTwist(const geometry_msgs::Pose &pose, const geometry_msgs::Twist &twist);
     void publishTF(const geometry_msgs::Pose &pose, const geometry_msgs::Twist &twist);
-    geometry_msgs::Quaternion getQuaternionFromYaw(const double &_yaw);
+    geometry_msgs::Quaternion getQuaternionFromRPY(const double &roll, const double &pitch, const double &yaw);
 };

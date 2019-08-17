@@ -31,6 +31,8 @@ public:
     ~WFSimModelTimeDelayTwist() = default;
 
 private:
+    const double MIN_TIME_CONSTANT;
+
     enum IDX
     {
         X = 0,
@@ -75,6 +77,8 @@ public:
     ~WFSimModelTimeDelaySteer() = default;
 
 private:
+    const double MIN_TIME_CONSTANT;
+
     enum IDX
     {
         X = 0,

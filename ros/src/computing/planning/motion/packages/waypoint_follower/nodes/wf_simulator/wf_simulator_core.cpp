@@ -16,12 +16,9 @@
 
 #include "wf_simulator_core.hpp"
 
-#define DEBUG_INFO(...)        \
-    {                          \
-        ROS_INFO(__VA_ARGS__); \
-    }
+#define DEBUG_INFO(...) { ROS_INFO(__VA_ARGS__);}
 
-WFSimulator::WFSimulator() : nh_(""), pnh_("~"), is_initialized_(false), is_prev_time_recorded_(false)
+WFSimulator::WFSimulator() : nh_(""), pnh_("~"), is_initialized_(false)
 {
     /* wf_simulator parameters */
     pnh_.param("loop_rate", loop_rate_, double(50.0));
@@ -30,6 +27,7 @@ WFSimulator::WFSimulator() : nh_(""), pnh_("~"), is_initialized_(false), is_prev
     pnh_.param("simulation_frame_id", simulation_frame_id_, std::string("sim_base_link"));
     pnh_.param("map_frame_id", map_frame_id_, std::string("map"));
     pnh_.param("lidar_frame_id", lidar_frame_id_, std::string("sim_lidar"));
+    pnh_.param("add_measurement_noise", add_measurement_noise_, bool(true));
 
     /* set pub sub topic name */
     std::string sim_pose_name, sim_velocity_name, sim_vehicle_status_name;
@@ -66,6 +64,7 @@ WFSimulator::WFSimulator() : nh_(""), pnh_("~"), is_initialized_(false), is_prev
     /* set vehicle model type */
     std::string vehicle_model_type_str;
     pnh_.param("vehicle_model_type", vehicle_model_type_str, std::string("IDEAL_TWIST"));
+    ROS_INFO("vehicle_model_type = %s", vehicle_model_type_str.c_str());
     if (vehicle_model_type_str == "IDEAL_TWIST")
     {
         vehicle_model_type_ = VehicleModelType::IDEAL_TWIST;
@@ -160,8 +159,6 @@ WFSimulator::WFSimulator() : nh_(""), pnh_("~"), is_initialized_(false), is_prev
     {
         ROS_WARN("initialize_source is undesired, setting error!!");
     }
-
-    prev_update_time_ = ros::Time::now();
     current_pose_.orientation.w = 1.0;
 }
 
@@ -195,35 +192,43 @@ void WFSimulator::timerCallbackPublishTF(const ros::TimerEvent &e)
 void WFSimulator::timerCallbackSimulation(const ros::TimerEvent &e)
 {
     if (!is_initialized_)
-        return;
-
-    if (!is_prev_time_recorded_)
     {
-        prev_update_time_ = ros::Time::now();
-        is_prev_time_recorded_ = true;
+        ROS_INFO_DELAYED_THROTTLE(3.0, "[wf_simulator] waiting initial position...");
+        return;
     }
 
+    if (prev_update_time_ptr_ == nullptr)
+    {
+        prev_update_time_ptr_ = std::make_shared<ros::Time>(ros::Time::now());
+    }
+    
+    const double sign_noise = (add_measurement_noise_ == true ? 1 : 0);
+
     /* calculate delta time */
-    const double dt = (ros::Time::now() - prev_update_time_).toSec();
-    prev_update_time_ = ros::Time::now();
+    const double dt = (ros::Time::now() - *prev_update_time_ptr_).toSec();
+    *prev_update_time_ptr_ = ros::Time::now();
 
     /* update vehicle dynamics */
     vehicle_model_ptr_->updateRungeKutta(dt);
 
-    /* save current vehicle pose & twist */
-    current_pose_.position.x = vehicle_model_ptr_->getX() + (*pos_norm_dist_ptr_)(*rand_engine_ptr_);
-    current_pose_.position.y = vehicle_model_ptr_->getY() + (*pos_norm_dist_ptr_)(*rand_engine_ptr_);
-    current_pose_.orientation = getQuaternionFromYaw(vehicle_model_ptr_->getYaw());
 
-    current_pose_.position.z = (*pos_norm_dist_ptr_)(*rand_engine_ptr_);
+    /* save current vehicle pose & twist */
+    current_pose_.position.x = vehicle_model_ptr_->getX() + (*pos_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
+    current_pose_.position.y = vehicle_model_ptr_->getY() + (*pos_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
+    const double roll = (*rpy_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
+    const double pitch = (*rpy_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
+    const double yaw = vehicle_model_ptr_->getYaw() + (*rpy_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
+    current_pose_.orientation = getQuaternionFromRPY(roll, pitch, yaw);
+
+    current_pose_.position.z = (*pos_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
     if (current_waypoints_ptr_ && current_closest_waypoint_ptr_)
     {
         const int idx = current_closest_waypoint_ptr_->data;
         if (-1 < idx && idx < (int)current_waypoints_ptr_->waypoints.size())
-            current_pose_.position.z = current_waypoints_ptr_->waypoints.at(idx).pose.pose.position.z;
+            current_pose_.position.z = current_waypoints_ptr_->waypoints.at(idx).pose.pose.position.z + (*pos_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
     }
-    current_twist_.linear.x = vehicle_model_ptr_->getVx() + (*vel_norm_dist_ptr_)(*rand_engine_ptr_);
-    current_twist_.angular.z = vehicle_model_ptr_->getWz() + (*angvel_norm_dist_ptr_)(*rand_engine_ptr_);
+    current_twist_.linear.x = vehicle_model_ptr_->getVx() + (*vel_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
+    current_twist_.angular.z = vehicle_model_ptr_->getWz() + (*angvel_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
 
     /* publish pose & twist */
     publishPoseTwist(current_pose_, current_twist_);
@@ -232,9 +237,10 @@ void WFSimulator::timerCallbackSimulation(const ros::TimerEvent &e)
     autoware_msgs::VehicleStatus vs;
     vs.header.stamp = ros::Time::now();
     vs.header.frame_id = "base_link";
-    vs.speed = current_twist_.linear.x;
-    vs.angle = vehicle_model_ptr_->getSteer() + (*steer_norm_dist_ptr_)(*rand_engine_ptr_);
+    vs.speed = current_twist_.linear.x + (*vel_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
+    vs.angle = vehicle_model_ptr_->getSteer() + (*steer_norm_dist_ptr_)(*rand_engine_ptr_) * sign_noise;
     pub_vehicle_status_.publish(vs);
+
 }
 
 void WFSimulator::callbackVehicleCmd(const autoware_msgs::VehicleCmdConstPtr &msg)
@@ -385,12 +391,9 @@ void WFSimulator::publishTF(const geometry_msgs::Pose &pose, const geometry_msgs
     tf_broadcaster_.sendTransform(lidar_trans);
 }
 
-geometry_msgs::Quaternion WFSimulator::getQuaternionFromYaw(const double &_yaw)
+geometry_msgs::Quaternion WFSimulator::getQuaternionFromRPY(const double &roll, const double &pitch, const double &yaw)
 {
     tf2::Quaternion q;
-    q.setRPY((*rpy_norm_dist_ptr_)(*rand_engine_ptr_),
-             (*rpy_norm_dist_ptr_)(*rand_engine_ptr_),
-             _yaw + (*rpy_norm_dist_ptr_)(*rand_engine_ptr_));
-
+    q.setRPY(roll, pitch, yaw);
     return tf2::toMsg(q);
 }
